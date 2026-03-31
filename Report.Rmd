@@ -1,0 +1,83 @@
+---
+title: "Iris Clustering Analysis"
+author: "Roshan Adhikari"
+date: "`r Sys.Date()`"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+# Ensure ggplot2 is available
+if(!require(ggplot2)) install.packages("ggplot2", repos="http://cran.us.r-project.org")
+library(ggplot2)
+```
+
+## Introduction
+This report performs unsupervised K-means clustering on the Iris dataset to identify natural groupings of plants based on their sepal and petal measurements, as outlined in the PRD.
+
+## Data Loading and Validation
+First, we load the data and validate the features.
+
+```{r load-data}
+file_path <- "data/iris.data"
+column_names <- c("sepal_length", "sepal_width", "petal_length", "petal_width", "class")
+
+if (file.exists(file_path)) {
+  df <- read.csv(file_path, header = FALSE, col.names = column_names)
+  iris_features <- df[, 1:4]
+  print("Data loaded successfully.")
+} else {
+  stop("Data file not found.")
+}
+```
+
+## Determining Optimal Clusters: Elbow Method
+To find the optimal number of clusters ($k$), we evaluate the Total Within-Cluster Sum of Squares (WSS) across different cluster counts.
+
+```{r elbow-plot, fig.height=4, fig.width=6}
+max_k <- 10
+wss <- numeric(max_k)
+
+for (k in 1:max_k) {
+  set.seed(42)
+  km <- kmeans(iris_features, centers = k, nstart = 20)
+  wss[k] <- km$tot.withinss
+}
+
+elbow_df <- data.frame(k = 1:max_k, wss = wss)
+ggplot(elbow_df, aes(x = k, y = wss)) +
+  geom_line(color = "steelblue", linewidth = 1) +
+  geom_point(color = "steelblue", size = 3) +
+  labs(
+    title = "Elbow Method for Optimal k",
+    x = "Number of Clusters (k)",
+    y = "Total Within-Cluster Sum of Squares (WSS)"
+  ) +
+  theme_minimal() +
+  scale_x_continuous(breaks = 1:max_k)
+```
+
+## K-means Clustering Results
+Based on the elbow plot, the reduction in WSS slows down significantly after **k = 3**, indicating it's an appropriate choice for our number of clusters.
+
+```{r kmeans, fig.height=4, fig.width=6}
+k <- 3
+set.seed(42)
+iris_clusters <- kmeans(iris_features, centers = k, nstart = 20)
+df$cluster <- as.factor(iris_clusters$cluster)
+
+# Evaluate against actual labels using a Confusion Matrix
+table(Cluster = df$cluster, Actual = df$class)
+
+# Visualization
+ggplot(df, aes(x = petal_length, y = petal_width, 
+               color = cluster, shape = class)) +
+  geom_point(size = 3, alpha = 0.8) +
+  labs(
+    title = paste("Iris Clustering (K-means, k =", k, ")"),
+    subtitle = "Color = Cluster, Shape = Actual Species",
+    x = "Petal Length (cm)",
+    y = "Petal Width (cm)"
+  ) +
+  theme_minimal()
+```
